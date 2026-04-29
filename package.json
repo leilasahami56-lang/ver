@@ -1,8 +1,23 @@
 {
-  "name": "vercel-xhttp-relay",
-  "version": "1.0.0",
-  "description": "Edge-runtime XHTTP relay for Xray/V2Ray on Vercel",
+  "name": "edge-services",
+  "version": "2.0.0",
+  "description": "High-performance edge computing and content delivery solutions",
+  "type": "module",
   "private": true,
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "keywords": [
+    "edge",
+    "cdn",
+    "vercel",
+    "serverless",
+    "edge-functions"
+  ],
+  "author": "",
   "license": "MIT",
-  "type": "module"
+  "engines": {
+    "node": ">=18.0.0"
+  }
 }
