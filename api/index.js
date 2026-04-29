@@ -27,6 +27,7 @@ const LANDING_PAGE = `<!DOCTYPE html>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cloud Edge Services</title>
     <meta name="description" content="High-performance edge computing and content delivery solutions">
+    <meta name="robots" content="index, follow">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -80,6 +81,21 @@ const LANDING_PAGE = `<!DOCTYPE html>
             font-size: 0.9em;
             color: #999;
         }
+        .stats {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin-top: 30px;
+            font-size: 0.9em;
+        }
+        .stat-item {
+            text-align: center;
+        }
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
     </style>
 </head>
 <body>
@@ -102,6 +118,21 @@ const LANDING_PAGE = `<!DOCTYPE html>
                 <p>Anycast network for reliability</p>
             </div>
         </div>
+
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-number">99.99%</div>
+                <div>Uptime SLA</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">100+</div>
+                <div>Edge Locations</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">24/7</div>
+                <div>Support</div>
+            </div>
+        </div>
         
         <div class="footer">
             <p>Status: <strong style="color: #28a745;">Operational</strong></p>
@@ -118,7 +149,6 @@ function getClientIp(req) {
 }
 
 function addNormalHeaders(headers) {
-  // Make it look like a normal web server/CDN
   headers.set("server", "Vercel");
   headers.set("x-powered-by", "Next.js");
   headers.set("x-content-type-options", "nosniff");
@@ -172,7 +202,7 @@ export default async function handler(req) {
       JSON.stringify({ 
         status: "healthy", 
         timestamp: new Date().toISOString(),
-        version: "1.0.0",
+        version: "2.0.0",
         region: process.env.VERCEL_REGION || "unknown"
       }), 
       {
@@ -185,6 +215,25 @@ export default async function handler(req) {
     );
   }
 
+  // Sitemap endpoint (makes it look even more like a real site)
+  if (path === "/sitemap.xml") {
+    const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://${req.headers.get("host")}/</loc>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>`;
+    return new Response(sitemap, {
+      status: 200,
+      headers: { 
+        "content-type": "application/xml",
+        "cache-control": "public, max-age=86400"
+      }
+    });
+  }
+
   // Check if TARGET_DOMAIN is set
   if (!TARGET_BASE) {
     return new Response(LANDING_PAGE, { 
@@ -195,6 +244,7 @@ export default async function handler(req) {
     });
   }
 
+  // Main proxy logic - NO RATE LIMITING
   try {
     const targetUrl = TARGET_BASE + path + url.search;
 
@@ -207,7 +257,6 @@ export default async function handler(req) {
       out.set(k, v);
     }
     
-    // Forward client IP
     out.set("x-forwarded-for", clientIp);
     
     // Add realistic headers if missing
@@ -221,6 +270,7 @@ export default async function handler(req) {
     const method = req.method;
     const hasBody = method !== "GET" && method !== "HEAD";
 
+    // Direct streaming proxy
     const upstreamRes = await fetch(targetUrl, {
       method,
       headers: out,
@@ -233,6 +283,7 @@ export default async function handler(req) {
     const responseHeaders = new Headers(upstreamRes.headers);
     addNormalHeaders(responseHeaders);
 
+    // Simple passthrough - no wrapping, no counting
     return new Response(upstreamRes.body, {
       status: upstreamRes.status,
       statusText: upstreamRes.statusText,
@@ -242,14 +293,48 @@ export default async function handler(req) {
   } catch (err) {
     console.error("relay error:", err);
     
-    // Return generic error page (doesn't reveal it's a proxy)
+    // Return generic error page
     const errorPage = `<!DOCTYPE html>
-<html>
-<head><title>502 Bad Gateway</title></head>
-<body style="font-family: sans-serif; text-align: center; padding: 50px;">
-  <h1>502 Bad Gateway</h1>
-  <p>The server encountered a temporary error.</p>
-  <p>Please try again in a few moments.</p>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>502 Bad Gateway</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .error-container {
+            text-align: center;
+            padding: 40px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            max-width: 500px;
+        }
+        h1 {
+            color: #e74c3c;
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+        p {
+            color: #666;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="error-container">
+        <h1>502</h1>
+        <h2>Bad Gateway</h2>
+        <p>The server encountered a temporary error and could not complete your request.</p>
+        <p>Please try again in a few moments.</p>
+    </div>
 </body>
 </html>`;
 
